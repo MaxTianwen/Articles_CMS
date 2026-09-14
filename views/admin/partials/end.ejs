@@ -1,0 +1,13 @@
+        </main>
+        <footer class="workspace-footer"><span>CONTENT DESK <span class="footer-dot">·</span> Content administration</span><span>Built with Express &amp; Tabler</span></footer>
+    </div>
+</div>
+<div class="toast-message" id="toast-message" role="status" hidden></div>
+<dialog id="delete-dialog" class="cms-dialog" aria-labelledby="delete-heading">
+    <form method="dialog"><button class="icon-button dialog-close" aria-label="Cancel deletion"><%- include('icon', {name:'close'}) %></button></form>
+    <span class="dialog-icon"><%- include('icon', {name:'trash'}) %></span><h2 id="delete-heading">Delete this article?</h2>
+    <p id="delete-description"></p><p class="text-secondary">This permanently removes the article. This action cannot be undone.</p>
+    <div class="alert alert-danger" id="delete-error" role="alert" hidden></div>
+    <div class="dialog-actions"><button class="btn" id="cancel-delete" type="button">Keep article</button><button class="btn btn-danger" id="confirm-delete" type="button">Delete article</button></div>
+</dialog>
+</body></html>

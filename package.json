@@ -1,21 +1,36 @@
 {
-  "name": "web322_as2_solution",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "cloudinary": "^2.5.1",
-    "ejs": "^3.1.10",
-    "express": "^5.2.1",
-    "method-override": "^3.0.0",
-    "multer": "^2.3.0",
-    "override": "^0.0.1",
-    "pg": "^8.13.1",
-    "streamifier": "^0.1.1"
-  }
+    "name": "web322_as2_solution",
+    "version": "1.0.0",
+    "main": "index.js",
+    "engines": {
+        "node": ">=22.9.0"
+    },
+    "scripts": {
+        "build": "node scripts/build-assets.js",
+        "start": "node --env-file-if-exists=.env index.js",
+        "dev": "node --env-file-if-exists=.env --watch index.js",
+        "demo": "node scripts/demo.js",
+        "test": "node --test --test-concurrency=1 tests/*.test.js",
+        "db:migrate": "node --env-file-if-exists=.env scripts/migrate.js",
+        "admin:create": "node --env-file-if-exists=.env scripts/create-admin.js"
+    },
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "cloudinary": "^2.5.1",
+        "ejs": "^3.1.10",
+        "express": "^5.2.1",
+        "multer": "^2.3.0",
+        "pg": "^8.13.1",
+        "express-session": "^1.18.2",
+        "connect-pg-simple": "^10.0.0",
+        "helmet": "^8.1.0",
+        "sharp": "^0.35.4",
+        "@tabler/core": "^1.4.0"
+    },
+    "devDependencies": {
+        "@electric-sql/pglite": "^0.3.14",
+        "supertest": "^7.1.4"
+    }
 }

@@ -1,3 +1,5 @@
+-- Historical coursework schema. Current setup/upgrade: npm run db:migrate.
+-- See migrations/001_admin_cms.sql for the active administrator CMS schema.
 -- Table: public.articles
 
 -- DROP TABLE IF EXISTS public.articles;

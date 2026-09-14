@@ -1,17 +1,22 @@
 {
     "version": 2,
     "builds": [
-      {
-        "src": "index.js",
-        "use": "@vercel/node",
-        "config": { "includeFiles": ["dist/**", "data/**"] }
-      }
+        {
+            "src": "package.json",
+            "use": "@vercel/static-build",
+            "config": { "distDir": "public" }
+        },
+        {
+            "src": "index.js",
+            "use": "@vercel/node",
+            "config": { "includeFiles": ["views/admin/**", "public/**"] }
+        }
     ],
     "routes": [
-      {
-        "src": "/(.*)",
-        "dest": "index.js"
-      }
+        { "handle": "filesystem" },
+        {
+            "src": "/(.*)",
+            "dest": "index.js"
+        }
     ]
-  }
-  
+}

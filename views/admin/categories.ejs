@@ -1,0 +1,5 @@
+<%- include('partials/start') %>
+<div class="page-heading"><div><div class="eyebrow">CONTENT ORGANIZATION</div><h1>Categories</h1><p>View article counts and browse content by category.</p></div><span class="badge bg-blue-lt"><%= categories.length %> categories</span></div>
+<div class="categories-grid"><% for (const category of categories) { %><a class="card category-card" href="/articles?category=<%= category.id %>"><span class="stat-icon tone-<%= ['blue','violet','green'][category.id % 3] %>"><%- include('partials/icon',{name:'category'}) %></span><h2><%= category.Name %></h2><p><%= category.articleCount %> <%= category.articleCount===1 ? 'article' : 'articles' %></p><span class="category-cta">View articles <%- include('partials/icon',{name:'arrow'}) %></span></a><% } %></div>
+<% if (!categories.length) { %><section class="card empty-state"><h2>No categories yet.</h2><p>Initial categories can be added during database setup.</p></section><% } %>
+<%- include('partials/end') %>

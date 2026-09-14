@@ -1,0 +1,3 @@
+<%- include('partials/start') %>
+<section class="card error-card"><div class="error-number"><%= status %></div><h1>Request could not be completed</h1><p><%= message %></p><a class="btn btn-primary" href="<%= admin ? '/' : '/login' %>"><%= admin ? 'Back to Home' : 'Go to sign in' %></a></section>
+<%- include('partials/end') %>

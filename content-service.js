@@ -1,195 +1,144 @@
-// Import the 'fs' module for interacting with the file system
-const { error } = require("console");
-const fs = require("fs");
-// Import Neon.tech database module
-const { Pool } = require('pg');
-const pool = new Pool({
-    user: 'SenecaDB_owner',
-    host: 'ep-summer-unit-a50wvl9o.us-east-2.aws.neon.tech',
-    database: 'blog_database',
-    password: 'w1leTkxd4HUm',
-    port: 5432,
-    ssl: { rejectUnauthorized: false },
-});
+// SQL stays here; routes select HTTP responses and EJS selects presentation.
+const { HttpError } = require('./lib/validation');
 
-// Arrays to store categories and articles data loaded from JSON files
-let categories = [];
-let articles = [];
-
-/* Initializers */
-// Function to initialize data by loading categories and articles from JSON files
-function initialize() {
-    return new Promise((resolve, reject) => {
-        // Read the categories data from categories.json file
-        fs.readFile("./data/categories.json", "utf8", (err, cat) => {
-            if (err) return reject(err); // Reject the promise if an error occurs during file read
-            categories = JSON.parse(cat); // Parse and store categories data
-
-            // Nested readFile for articles.json
-            // We nest the second file read inside the first because we want to ensure that categories.json
-            // is successfully read and parsed before moving on to articles.json.
-            // This way, we load both files sequentially and can handle any errors independently.
-            fs.readFile("./data/articles.json", "utf8", (err, art) => {
-                if (err) return reject(err); // Reject the promise if an error occurs during file read
-                articles = JSON.parse(art); // Parse and store articles data
-                
-                // We call resolve() only once, after both files have been successfully read and parsed.
-                // Calling resolve() here signifies that initialization is complete and both categories
-                // and articles data are ready for use. If we called resolve() earlier, it would 
-                // prematurely indicate that initialization was complete before loading both files.
-                resolve(); 
+function createContentService(pool) {
+    const columns =
+        'a.*, a."articleDate"::text AS "articleDate", c."Name" AS "categoryName"';
+    const joined = 'articles a LEFT JOIN categories c ON c.id = a.category';
+    async function getCategories() {
+        const result = await pool.query(
+            'SELECT c.*, COUNT(a.id)::int AS "articleCount" FROM categories c LEFT JOIN articles a ON a.category = c.id GROUP BY c.id, c."Name" ORDER BY c."Name"',
+        );
+        return result.rows;
+    }
+    async function getArticles(filters = {}) {
+        const values = [],
+            conditions = [];
+        function add(sql, value) {
+            values.push(value);
+            conditions.push(sql.replace('?', '$' + values.length));
+        }
+        if (filters.search)
+            add(
+                'a.title ILIKE ?',
+                '%' + filters.search.replace(/[\\%_]/g, '\\$&') + '%',
+            );
+        if (filters.category) add('a.category = ?', filters.category);
+        if (filters.status === 'published')
+            conditions.push('a.published = true');
+        if (filters.status === 'draft')
+            conditions.push('a.published IS NOT TRUE');
+        if (filters.minDate) add('a."articleDate" >= ?', filters.minDate);
+        const where = conditions.length
+            ? ' WHERE ' + conditions.join(' AND ')
+            : '';
+        const count = await pool.query(
+            'SELECT COUNT(*)::int AS total FROM articles a' + where,
+            values,
+        );
+        const total = count.rows[0].total,
+            pages = Math.max(1, Math.ceil(total / 10));
+        const page = Math.min(filters.page || 1, pages);
+        const order = {
+            newest: 'a."articleDate" DESC NULLS LAST, a.id DESC',
+            oldest: 'a."articleDate" ASC NULLS LAST, a.id ASC',
+            title: 'a.title ASC, a.id ASC',
+        }[filters.sort || 'newest'];
+        const result = await pool.query(
+            `SELECT ${columns} FROM ${joined}${where} ORDER BY ${order} LIMIT 10 OFFSET $${values.length + 1}`,
+            [...values, (page - 1) * 10],
+        );
+        return { articles: result.rows, total, page, pages };
+    }
+    async function getArticle(id) {
+        const result = await pool.query(
+            `SELECT ${columns} FROM ${joined} WHERE a.id = $1`,
+            [id],
+        );
+        if (!result.rows.length) throw new HttpError(404, 'Article not found.');
+        return result.rows[0];
+    }
+    async function checkCategory(category) {
+        const result = await pool.query(
+            'SELECT id FROM categories WHERE id = $1',
+            [category],
+        );
+        if (!result.rows.length)
+            throw new HttpError(400, 'Choose an existing category.', {
+                category: 'This category no longer exists.',
             });
-        });
-    });
-}
-
-/* Queries */
-// Function to get only published articles by filtering the articles array
-function getPublishedArticles() {
-    return pool.query(
-        'SELECT * \
-        FROM articles\
-        WHERE published = true'
-    )
-        .then(res => res.rows)
-        .catch(() => Promise.reject('No results'));
-}
-
-// Function to get all categories
-function getCategories() {
-    return pool.query('SELECT * FROM categories')
-        .then(res => res.rows)
-        .catch(() => Promise.reject('No results'));
-}
-
-// Function to get all articles
-function getArticles() {
-    return pool.query('SELECT * FROM articles')
-        .then(res => res.rows)
-        .catch(() => Promise.reject('No results'));
-}
-
-// Function to get articles by category
-function getArticlesByCategory(category) {
-    return pool.query(
-        'SELECT *\
-        FROM articles\
-        WHERE articles.category = $1', [category]
-    )
-        .then(res => res.rows)
-        .catch(() => Promise.reject('No results'));
-}
-
-// Function to get articles by min date
-function getArticlesByMinDate(minDateStr) {
-    return pool.query(
-        'SELECT *\
-        FROM articles\
-        WHERE articles.articleDate >= $[1]', [minDateStr]
-    )
-        .then(res => res.rows)
-        .catch(() => Promise.reject('No results'));
-}
-
-// Function to get articles by ID
-function getArticlesById(id) {
-    return pool.query(
-        `SELECT * FROM articles WHERE id = $1`, [id]
-    )
-        .then(res => {
-            if (res.rows.length === 0) {
-                return Promise.reject("No article found");
-            }
-            return res.rows[0];
-        })
-        .catch(() => Promise.reject('No results'));
-}
-
-
-/* Modifiers */
-// Function to add a new article
-function addArticle(article) {
-    const query =
-        `INSERT INTO articles (title, content, author, category, published, "articleDate", "featureImage")
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING *`;
-    
-    const values = [
-        article.title,
-        article.content,
-        article.author,
-        article.category,
-        article.published === 'on' ? true : false,
-        article.articleDate || new Date(),
-        article.featureImage || null
-    ];
-
-    return pool.query(query, values)
-        .then(res => res.rows[0])
-        .catch(() => Promise.reject('Failed to add article'));
-}
-
-// Function to update an article by ID
-function updateArticle(id, article) {
-    const query =
-    ` UPDATE articles
-    SET 
-        title = $1,
-        content = $2,
-        author = $3,
-        category = $4,
-        published = $5,
-        "articleDate" = $6,
-        "featureImage" = $7
-    WHERE id = $8
-    RETURNING *`;
-            
-    const values = [
-        article.title,
-        article.content,
-        article.author,
-        article.category,
-        article.published === true,
-        article.articleDate,
-        article.featureImage,
-        id
-    ];
-    
-    return pool.query(query, values)
-        .then(res => {
-            if (res.rowCount === 0) {
-                return Promise.reject(`No article found with ID: ${id}`);
-            }
-            return res.rows[0];
-        })
-        .catch(() => Promise.reject(`Failed to update article with ID: ${id}`));
-}
-
-
-// Function to delete an article by ID
-function deleteArticle(id) {
-    return pool.query('DELETE FROM articles WHERE id = $1 RETURNING *', [id])
-        .then(res => {
-            if (res.rowCount === 0) {
-                return Promise.reject('No article found');
-            }
-            return res.rows[0];
-        })
-        .catch(() => Promise.reject('Failed to delete article'));
-}
-
-
-/* Helpers */
-// Change the category ID to the category name in each article
-function addCategoryToArticle(article) {
-    const category = categories.find(category => category.id === article.category);
+    }
+    async function addArticle(article) {
+        await checkCategory(article.category);
+        const result = await pool.query(
+            'INSERT INTO articles (title, content, author, category, published, "articleDate", "featureImage", "featureImagePublicId") VALUES ($1,$2,$3,$4,$5,CURRENT_DATE,$6,$7) RETURNING *',
+            [
+                article.title,
+                article.content,
+                article.author,
+                article.category,
+                article.published,
+                article.featureImage || null,
+                article.featureImagePublicId || null,
+            ],
+        );
+        return result.rows[0];
+    }
+    async function updateArticle(id, article) {
+        await checkCategory(article.category);
+        // Missing image means preserve the DB value, not trust a hidden URL.
+        const replaceImage = article.featureImage !== undefined;
+        const result = await pool.query(
+            'UPDATE articles SET title=$1, content=$2, author=$3, category=$4, published=$5, "featureImage"=CASE WHEN $6 THEN $7 ELSE "featureImage" END, "featureImagePublicId"=CASE WHEN $6 THEN $8 ELSE "featureImagePublicId" END, updated_at=CURRENT_TIMESTAMP WHERE id=$9 RETURNING *',
+            [
+                article.title,
+                article.content,
+                article.author,
+                article.category,
+                article.published,
+                replaceImage,
+                article.featureImage ?? null,
+                article.featureImagePublicId ?? null,
+                id,
+            ],
+        );
+        if (!result.rows.length) throw new HttpError(404, 'Article not found.');
+        return result.rows[0];
+    }
+    async function deleteArticle(id) {
+        const result = await pool.query(
+            'DELETE FROM articles WHERE id=$1 RETURNING *',
+            [id],
+        );
+        if (!result.rows.length) throw new HttpError(404, 'Article not found.');
+        return result.rows[0];
+    }
+    async function getDashboard() {
+        const counts = await pool.query(
+            'SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE published=true)::int AS published, COUNT(*) FILTER (WHERE published IS NOT TRUE)::int AS drafts FROM articles',
+        );
+        const recent = await pool.query(
+            `SELECT ${columns} FROM ${joined} ORDER BY a.updated_at DESC NULLS LAST, a.id DESC LIMIT 5`,
+        );
+        const drafts = await pool.query(
+            `SELECT ${columns} FROM ${joined} WHERE a.published IS NOT TRUE ORDER BY a.updated_at DESC NULLS LAST, a.id DESC LIMIT 3`,
+        );
+        return {
+            counts: counts.rows[0],
+            recent: recent.rows,
+            drafts: drafts.rows,
+            categories: await getCategories(),
+        };
+    }
     return {
-        ...article,
-        categoryName: category.Name,
-        category: article.category
+        getCategories,
+        getArticles,
+        getArticle,
+        checkCategory,
+        addArticle,
+        updateArticle,
+        deleteArticle,
+        getDashboard,
     };
 }
-
-/* Exports */
-// Export the functions as an object to make them available to other files
-module.exports = { initialize, getCategories, getArticles, addArticle, getPublishedArticles, getArticlesByCategory, getArticlesByMinDate, getArticlesById, addCategoryToArticle, updateArticle, deleteArticle };
+module.exports = { createContentService };

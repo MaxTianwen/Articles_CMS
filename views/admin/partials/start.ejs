@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="<%= csrf %>">
+    <title><%= title %> · CONTENT DESK</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/vendor/tabler/css/tabler.min.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <script src="/js/admin.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<% const navigationItems = [{url:'/',label:'Home',icon:'home'}, {url:'/articles',label:'Articles',icon:'article'}, {url:'/categories',label:'Categories',icon:'category'}]; %>
+<%
+const pagePath = current.replace(/\/+$/, '') || '/';
+const breadcrumbs = [{label:'Home', url:'/'}];
+if (pagePath !== '/') {
+    if (pagePath.startsWith('/articles/')) breadcrumbs.push({label:'Articles', url:'/articles'});
+    breadcrumbs.push({label:pagePath === '/articles' ? 'Articles' : pagePath === '/categories' ? 'Categories' : pagePath === '/about' ? 'About' : title});
+}
+%>
+<div class="workspace">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+        <a class="brand" href="/"><span class="brand-mark"><%- include('icon', { name: 'article' }) %></span><span class="brand-name">CONTENT DESK</span></a>
+        <div class="workspace-label">ADMINISTRATION</div>
+        <nav class="nav-stack">
+            <% for (const item of navigationItems) { const active = item.url === '/' ? current === '/' : current.startsWith(item.url); %>
+            <a href="<%= item.url %>" class="nav-item <%= active ? 'active' : '' %>" <%- active ? 'aria-current="page"' : '' %>><%- include('icon', {name:item.icon}) %><span><%= item.label %></span></a>
+            <% } %>
+        </nav>
+        <a class="btn sidebar-create" href="/articles/add"><%- include('icon', {name:'plus'}) %>New article</a>
+        <div class="sidebar-bottom">
+            <a class="nav-item <%= current === '/about' ? 'active' : '' %>" href="/about"><%- include('icon', {name:'info'}) %>About</a>
+            <div class="account"><span class="avatar avatar-sm bg-blue-lt"><%= (admin?.username || 'A').slice(0,1).toUpperCase() %></span><div><strong><%= admin?.username || 'Administrator' %></strong><span>Administrator</span></div>
+            <% if (admin) { %><form action="/logout" method="POST"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="icon-button" aria-label="Sign out" title="Sign out"><%- include('icon', {name:'logout'}) %></button></form><% } %></div>
+        </div>
+    </aside>
+    <div class="main-area">
+        <header class="topbar"><div class="topbar-left"><button class="icon-button mobile-menu" id="menu-toggle" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><%- include('icon', {name:'menu'}) %></button><nav class="breadcrumb-nav" aria-label="Breadcrumb"><ol class="breadcrumb-list"><% breadcrumbs.forEach((item, index) => { %><li><% if (index > 0) { %><span class="breadcrumb-separator" aria-hidden="true">/</span><% } %><% if (index < breadcrumbs.length - 1) { %><a href="<%= item.url %>"><%= item.label %></a><% } else { %><span aria-current="page"><%= item.label %></span><% } %></li><% }) %></ol></nav></div><span class="private-label"><span class="status-dot"></span>Administrator access</span></header>
+        <% if (demo) { %><div class="demo-strip">LOCAL DEMO · Sample data only. Changes disappear when this demo restarts.</div><% } %>
+        <main id="main" class="page-content">
+        <noscript><div class="alert alert-warning">JavaScript is required for saving articles, image previews and delete confirmations.</div></noscript>
